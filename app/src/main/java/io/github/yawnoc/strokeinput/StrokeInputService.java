@@ -21,6 +21,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -32,7 +33,6 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 import io.github.yawnoc.utilities.Contexty;
@@ -97,7 +97,7 @@ public class StrokeInputService
   public static final String PREFERENCES_FILE_NAME = "preferences.txt";
   private static final String KEYBOARD_NAME_PREFERENCE_KEY = "keyboardName";
   
-  private static final String SEQUENCE_CHARACTERS_FILE_NAME = "sequence-characters.txt";
+  private static final String SEQUENCE_CHARACTERS_FILE_NAME = "sequence-characters.ser";
   private static final String CHARACTERS_FILE_NAME_TRADITIONAL = "characters-traditional.txt";
   private static final String CHARACTERS_FILE_NAME_SIMPLIFIED = "characters-simplified.txt";
   private static final String RANKING_FILE_NAME_TRADITIONAL = "ranking-traditional.txt";
@@ -208,10 +208,22 @@ public class StrokeInputService
     }
   }
   
+  @SuppressWarnings("unchecked")
   private void initialiseStrokeInput()
   {
-    charactersFromStrokeDigitSequence = new TreeMap<>();
-    loadSequenceCharactersDataIntoMap(SEQUENCE_CHARACTERS_FILE_NAME, charactersFromStrokeDigitSequence);
+    final long startMillis = System.currentTimeMillis();
+    try
+    {
+      InputStream inputStream = getResources().openRawResource(R.raw.sequence_characters);
+      ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+      charactersFromStrokeDigitSequence = (NavigableMap<String, String>) objectInputStream.readObject();
+    }
+    catch (IOException | ClassNotFoundException exception)
+    {
+      exception.printStackTrace();
+    }
+    final long endMillis = System.currentTimeMillis();
+    sendLoadingTimeLog(SEQUENCE_CHARACTERS_FILE_NAME, endMillis - startMillis);
     
     codePointSetTraditional = new HashSet<>();
     codePointSetSimplified = new HashSet<>();
@@ -237,40 +249,6 @@ public class StrokeInputService
   private static boolean isCommentLine(final String line)
   {
     return line.startsWith("#") || line.length() == 0;
-  }
-  
-  @SuppressWarnings("SameParameterValue")
-  private void loadSequenceCharactersDataIntoMap(
-    final String sequenceCharactersFileName,
-    final Map<String, String> charactersFromStrokeDigitSequence
-  )
-  {
-    final long startMillis = System.currentTimeMillis();
-    
-    try
-    {
-      final InputStream inputStream = getAssets().open(sequenceCharactersFileName);
-      final BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-      
-      String line;
-      while ((line = bufferedReader.readLine()) != null)
-      {
-        if (!isCommentLine(line))
-        {
-          final String[] sunderedLineArray = Stringy.sunder(line, "\t");
-          final String strokeDigitSequence = sunderedLineArray[0];
-          final String characters = sunderedLineArray[1];
-          charactersFromStrokeDigitSequence.put(strokeDigitSequence, characters);
-        }
-      }
-    }
-    catch (IOException exception)
-    {
-      exception.printStackTrace();
-    }
-    
-    final long endMillis = System.currentTimeMillis();
-    sendLoadingTimeLog(sequenceCharactersFileName, endMillis - startMillis);
   }
   
   private void loadCharactersIntoCodePointSet(final String charactersFileName, final Set<Integer> codePointSet)
